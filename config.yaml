@@ -1,0 +1,15 @@
+# saveloop configuration
+# Change weights or thresholds to match your goal.
+
+objective:
+  weights:
+    save_rate: 0.6    # saves ÷ views
+    comment_rate: 0.3 # comments ÷ views
+    dm_rate: 0.1      # DMs started ÷ profile visits
+
+thresholds:
+  reel_engagement_win: 0.005      # 0.50 percent
+  carousel_engagement_win: 0.0055 # 0.55 percent
+
+reporting:
+  summary_filename: weekly_summary.md

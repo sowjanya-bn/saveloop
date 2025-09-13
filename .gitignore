@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# OS
+.DS_Store
+
+# Data outputs
+data/out/*
+!data/out/.gitkeep
+
+# Editors
+.vscode/
+.idea/
