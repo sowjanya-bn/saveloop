@@ -1,0 +1,11 @@
+project:
+  name: saveloop
+  version: 0.2.0
+
+paths:
+  raw_data_dir: data/raw
+  processed_data_dir: data/processed
+  reports_dir: data/reports
+
+reporting:
+  summary_filename: weekly_summary.md

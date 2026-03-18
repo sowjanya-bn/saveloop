@@ -1,0 +1,4 @@
+week_id,experiment,variant_a,variant_b,metric,status,result_note,decision_next_week
+W38,First frame: steam vs text first,steam-closeup,text-first,J_score,planned,,
+W39,Overlay length: 6w vs 9w,6w,9w,save_rate,planned,,
+W40,Timing: Sun 15:30 vs 16:30,15:30,16:30,engagement_rate,planned,,

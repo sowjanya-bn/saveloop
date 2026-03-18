@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
-python -m saveloop.cli analyze
+set -e
+python -m saveloop.cli run
