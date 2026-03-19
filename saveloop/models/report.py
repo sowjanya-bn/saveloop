@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass(slots=True)
+@dataclass
 class WeeklyReport:
     posts_analysed: int
     mean_j: float | None
@@ -11,4 +11,5 @@ class WeeklyReport:
     best_j: float | None
     wins: int
     highlights: list[str] = field(default_factory=list)
+    low_data_warning: str | None = None
     suggestion: str | None = None

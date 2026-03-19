@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from saveloop.analysis.recommendations import generate_recommendation
+from saveloop.analysis.recommendations import PATTERN_MAP, generate_recommendation
 from saveloop.config import load_settings
 from saveloop.io.loaders import load_csv_if_exists, load_posts_log
 from saveloop.io.writers import ensure_output_dirs, write_dataframe, write_text
@@ -46,6 +46,11 @@ def write_summary() -> Path:
     best_post_id = None
     best_j = None
     highlights: list[str] = []
+    low_data_warning = None
+
+    if len(posts_df) < 5:
+        low_data_warning = "The current recommendation is based on a small sample, so use it as a directional guide rather than a fixed rule."
+
     if not posts_df["J_score"].dropna().empty:
         best_index = posts_df["J_score"].idxmax()
         best_post_id = str(posts_df.loc[best_index, "post_id"])
@@ -55,7 +60,10 @@ def write_summary() -> Path:
     wins_count = int((posts_df["win_flag"] == "win").sum()) if "win_flag" in posts_df.columns else 0
     if not tag_performance.empty:
         top_tag = tag_performance.iloc[0]["tag"]
-        highlights.append(f"Top current tag by mean J is {top_tag}.")
+        highlights.append(f"The strongest current aesthetic tag is {top_tag}.")
+    if not pattern_performance.empty:
+        top_pattern_code = str(pattern_performance.iloc[0]["pattern"])
+        highlights.append(f"The strongest pattern so far is {PATTERN_MAP.get(top_pattern_code, top_pattern_code)}.")
 
     report = WeeklyReport(
         posts_analysed=len(posts_df),
@@ -64,6 +72,7 @@ def write_summary() -> Path:
         best_j=best_j,
         wins=wins_count,
         highlights=highlights,
+        low_data_warning=low_data_warning,
     )
     recommendation = generate_recommendation(posts_df, tag_performance, pattern_performance)
 

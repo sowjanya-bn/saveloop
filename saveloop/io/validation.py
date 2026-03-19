@@ -6,6 +6,7 @@ import pandas as pd
 
 REQUIRED_POST_COLUMNS = [
     "post_id",
+    "bundle_id",
     "date_posted",
     "format",
     "pattern",
