@@ -2,3 +2,12 @@ pandas>=2.0.0
 PyYAML>=6.0.0
 python-dotenv>=1.0.1
 requests>=2.31.0
+streamlit>=1.40.0
+google-genai>=1.0.0
+Pillow>=10.0.0
+
+# Optional for local AI image generation
+# diffusers>=0.35.0
+# transformers>=4.45.0
+# accelerate>=0.34.0
+# torch>=2.4.0

@@ -1,0 +1,11 @@
+strategy:
+  keep_control_post: true
+  max_aesthetic_changes_per_week: 1
+  max_timing_changes_per_week: 1
+  min_observations_for_confidence: 2
+
+default_tests:
+  - name: first-frame-test
+    description: Test steam first vs text first on the next reel.
+  - name: timing-test
+    description: Shift posting time by plus or minus 60 minutes.

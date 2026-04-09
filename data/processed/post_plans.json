@@ -1,0 +1,56 @@
+[
+  {
+    "bundle_id": "e57772bb",
+    "bundle_title": "Fitness angle: Protein Coffee",
+    "trend_keyword": "protein coffee",
+    "theme": "fitness",
+    "format": "reel",
+    "posting_window": "07:00-09:00",
+    "priority_score": 0.82,
+    "generated_at": "2026-04-08T23:29:37.248789+00:00",
+    "text_provider": "rule_based",
+    "hook": "Why protein coffee is everywhere right now and how to make it useful",
+    "hook_pattern": "contrast",
+    "overlay_text": "Why protein coffee is everywhere right now and how to make it useful",
+    "caption": "Everyone is talking about protein coffee. Here is the simple version worth trying. \n\nTry this angle: make the first beat instantly clear, keep the visual language consistent, and finish with a takeaway people will want to save.\n\nSave this for your next workout week.",
+    "script_bullets": [
+      "Show the usual mistake people make with protein coffee",
+      "Reveal one easy fix people can try today",
+      "End with the practical takeaway worth saving"
+    ],
+    "slides": [
+      {
+        "title": "The problem",
+        "body": "Most people approach protein coffee wrong and burn out in week one."
+      },
+      {
+        "title": "The fix",
+        "body": "One small change removes most of the friction — no extra gear needed."
+      },
+      {
+        "title": "Step by step",
+        "body": "Try this exact sequence next time you work on protein coffee."
+      },
+      {
+        "title": "Common mistakes",
+        "body": "Skipping rest, skipping tracking, skipping the easy win. Stop all three."
+      },
+      {
+        "title": "Your takeaway",
+        "body": "Bookmark this. Next time you touch protein coffee you will know exactly what to do."
+      }
+    ],
+    "tone": "clear, energetic, practical",
+    "closing_cta": "Save this for your next workout week",
+    "image_prompt": "Instagram reel concept about protein coffee, theme fitness. Visual direction: Bright kitchen counter, quick cut sequence, simple overlay text. Aesthetic tags: clean_bright, close_up. Editorial, high detail, creator-friendly, natural lighting, text-safe composition.",
+    "image_alt_text": "Generated concept image for protein coffee in a fitness style.",
+    "image_path": "/Users/sowjanya/code/saveloop/data/generated/images/e57772bb.png",
+    "image_generated": true,
+    "image_backend": "local_prompt_card",
+    "image_error": null,
+    "music_style": "Upbeat training pop",
+    "music_note": "steady build, clean drop, motivating but not aggressive. Start right on the beat so the opening friction lands quickly.",
+    "hashtags": "#ProteinCoffee,#Fitness,#contentstrategy,#creatorworkflow",
+    "status": "generated"
+  }
+]

@@ -1,0 +1,8 @@
+post_id,bundle_id,date_posted,format,pattern,aesthetic_tags,views,reach,likes,comments,saves,shares,profile_visits,follows,avg_view_duration_s,replays,dms_started,note
+WED-PROTEIN-1,b7096d32,2026-03-10,Reel,P01,"clean-bg,close-up,warm-light",4200,3600,230,14,176,52,48,11,8.2,340,6,"Hook led with problem statement. AFS: 4,4,5,4,4,4,4,4,4"
+SUN-PROTEIN-2,b7096d32,2026-03-12,Reel,P02,"clean-bg,text-minimal,warm-light",3900,3410,201,10,133,41,39,8,7.4,298,4,"Text-first version. AFS: 4,4,4,4,3,4,4,4,4"
+MON-ROUTINE-1,b1e2777d,2026-03-13,Reel,P01,"warm-minimal,desk-setup,clean-bg",5100,4300,278,17,188,61,66,15,9.6,401,9,"Morning routine with face-first intro. AFS: 5,4,4,5,4,4,5,4,4"
+TUE-ROUTINE-2,cf8244d2,2026-03-14,Reel,P03,"soft-light,day-in-life,warm-light",4800,4100,251,22,164,58,62,12,9.1,388,7,"Routine story edit. AFS: 4,4,4,4,4,4,4,4,4"
+THU-BREAKFAST-1,929432af,2026-03-15,Carousel,P03,"warm-minimal,kitchen-closeup,clean-bg",3000,2600,180,13,149,34,35,6,0,0,3,"Utility carousel with ingredient close-ups. AFS: 4,5,4,4,5,4,4,4,4"
+FRI-BREAKFAST-2,929432af,2026-03-16,Carousel,P03,"warm-minimal,kitchen-closeup,text-minimal",2850,2480,169,11,141,30,29,5,0,0,2,"Caption slightly longer. AFS: 4,4,4,4,4,4,4,4,4"
+SAT-RESET-1,cf8244d2,2026-03-17,Reel,P01,"soft-light,day-in-life,close-up",4600,3980,242,18,156,46,57,10,8.7,351,5,"Lifestyle reset cut with close-up opening. AFS: 4,4,5,4,4,4,4,4,4"

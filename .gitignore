@@ -1,17 +1,19 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .venv/
-venv/
+.saveloop/
+
+# Env
 .env
+
+# IDE
+.idea/
+.vscode/
+
+# Generated data (large, ephemeral)
+data/generated/
 
 # OS
 .DS_Store
-
-# Data outputs
-data/out/*
-!data/out/.gitkeep
-
-# Editors
-.vscode/
-.idea/
