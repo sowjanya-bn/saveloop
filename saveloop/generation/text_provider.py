@@ -26,6 +26,9 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text[start:end + 1])
 
 
+_ALLOWED_HOOK_PATTERNS = {"question", "bold_claim", "number_list", "contrast", "story_open"}
+
+
 def _normalize_copy(data: dict[str, Any], fallback: dict[str, Any]) -> dict[str, Any]:
     bullets = data.get("bullets") or fallback["bullets"]
     if not isinstance(bullets, list):
@@ -40,6 +43,24 @@ def _normalize_copy(data: dict[str, Any], fallback: dict[str, Any]) -> dict[str,
     if len(normalized_bullets) < 3:
         normalized_bullets = fallback["bullets"]
 
+    # slides — must be exactly 5 {"title": str, "body": str} dicts
+    raw_slides = data.get("slides") or []
+    valid_slides: list[dict[str, str]] = []
+    if isinstance(raw_slides, list):
+        for s in raw_slides:
+            if isinstance(s, dict) and s.get("title") and s.get("body"):
+                valid_slides.append({
+                    "title": str(s["title"]).strip()[:40],
+                    "body": str(s["body"]).strip()[:120],
+                })
+    if len(valid_slides) != 5:
+        valid_slides = fallback.get("slides", [])
+
+    # hook_pattern
+    hook_pattern = str(data.get("hook_pattern") or fallback.get("hook_pattern", "bold_claim")).strip()
+    if hook_pattern not in _ALLOWED_HOOK_PATTERNS:
+        hook_pattern = fallback.get("hook_pattern", "bold_claim")
+
     return {
         "tone": str(data.get("tone") or fallback["tone"]).strip(),
         "hook": hook,
@@ -47,6 +68,8 @@ def _normalize_copy(data: dict[str, Any], fallback: dict[str, Any]) -> dict[str,
         "caption": str(data.get("caption") or fallback["caption"]).strip(),
         "bullets": normalized_bullets[:3],
         "closing_cta": str(data.get("closing_cta") or fallback["closing_cta"]).strip(),
+        "hook_pattern": hook_pattern,
+        "slides": valid_slides,
     }
 
 

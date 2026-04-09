@@ -5,9 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from saveloop.generation.carousel_renderer import render_carousel
 from saveloop.generation.image_provider import maybe_generate_image
 from saveloop.generation.music_selector import select_music
 from saveloop.generation.text_provider import generate_post_copy
+from saveloop.generation.zip_exporter import build_instagram_zip
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = ROOT / "data" / "processed" / "post_plans.json"
@@ -33,9 +35,11 @@ def build_post_plan(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "text_provider": text_provider,
         "hook": copy["hook"],
+        "hook_pattern": copy.get("hook_pattern", "bold_claim"),
         "overlay_text": copy["overlay_text"],
         "caption": copy["caption"],
         "script_bullets": copy["bullets"],
+        "slides": copy.get("slides", []),
         "tone": copy["tone"],
         "closing_cta": copy["closing_cta"],
         "image_prompt": image["image_prompt"],
@@ -49,6 +53,20 @@ def build_post_plan(
         "hashtags": bundle.get("hashtags"),
         "status": "generated",
     }
+
+
+def export_instagram_pack(
+    plan: dict[str, Any],
+    output_dir: Path | None = None,
+) -> bytes:
+    """
+    Render carousel slides and package into an in-memory zip.
+    Returns raw zip bytes ready for st.download_button.
+    """
+    if not plan.get("slides"):
+        raise ValueError("Plan has no slides — regenerate with the current version.")
+    slide_paths = render_carousel(plan, output_dir=output_dir)
+    return build_instagram_zip(slide_paths, plan)
 
 
 def save_post_plan(plan: dict[str, Any], output_path: Path | None = None) -> Path:

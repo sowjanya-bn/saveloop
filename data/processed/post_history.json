@@ -1,0 +1,33 @@
+[
+  {
+    "week": "2026-W15",
+    "generated": "2026-04-09",
+    "palette": "Sage",
+    "posts": [
+      {
+        "bundle_id": "c21188c2",
+        "bundle_title": "£3 Dinner Ideas",
+        "trend_keyword": "£3 dinner ideas",
+        "pillar": "weeknight_recipes",
+        "post_day": "Tuesday",
+        "hook": "Everyone does £3 dinner ideas wrong. Here is what actually works."
+      },
+      {
+        "bundle_id": "554cc94e",
+        "bundle_title": "Simple Grocery Swaps",
+        "trend_keyword": "simple grocery swaps",
+        "pillar": "grocery_swaps",
+        "post_day": "Wednesday",
+        "hook": "These grocery swaps could save you £20 this week"
+      },
+      {
+        "bundle_id": "ad5d31d4",
+        "bundle_title": "Tiny Sunday Habits",
+        "trend_keyword": "tiny Sunday habits",
+        "pillar": "sunday_reset",
+        "post_day": "Sunday",
+        "hook": "I used to get Sunday resets completely wrong until I tried this"
+      }
+    ]
+  }
+]

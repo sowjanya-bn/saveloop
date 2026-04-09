@@ -1,236 +1,367 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
 
-from saveloop.generation.post_assembler import build_post_plan, save_post_plan
+load_dotenv()
+
+from saveloop.generation.color_schemes import PALETTES, palette_for_week
+from saveloop.generation.post_assembler import build_post_plan, export_instagram_pack, save_post_plan
+from saveloop.generation.post_history import all_history, mark_posted, posted_keywords
+from saveloop.generation.weekly_planner import build_weekly_pack
 
 ROOT = Path(__file__).resolve().parents[2]
-trends_path = ROOT / "data" / "raw" / "trends_snapshot.csv"
-bundles_path = ROOT / "data" / "processed" / "content_bundles.csv"
-summary_path = ROOT / "data" / "reports" / "weekly_summary.md"
-posts_path = ROOT / "data" / "processed" / "posts_log_with_metrics.csv"
+trends_path     = ROOT / "data" / "raw"       / "trends_snapshot.csv"
+bundles_path    = ROOT / "data" / "processed" / "content_bundles.csv"
+summary_path    = ROOT / "data" / "reports"   / "weekly_summary.md"
+posts_path      = ROOT / "data" / "processed" / "posts_log_with_metrics.csv"
 post_plans_path = ROOT / "data" / "processed" / "post_plans.json"
+catalog_path    = ROOT / "data" / "processed" / "weekly_catalog.json"
 
-st.set_page_config(page_title="SaveLoop", layout="wide")
-st.title("SaveLoop")
-st.caption("Trend → bundle → generate → post → performance")
+st.set_page_config(page_title="SaveLoop", layout="wide", page_icon="🔁")
 
+_gemini_available = bool(os.getenv("GEMINI_API_KEY"))
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _load_csv(path: Path) -> pd.DataFrame:
-    if path.exists():
-        return pd.read_csv(path)
-    return pd.DataFrame()
+    return pd.read_csv(path) if path.exists() else pd.DataFrame()
 
-
-def _load_post_plans(path: Path) -> list[dict]:
+def _load_json_list(path: Path) -> list[dict]:
     if path.exists():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, list):
                 return data
         except json.JSONDecodeError:
-            return []
+            pass
     return []
 
+def _save_json_list(path: Path, data: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
-trends_df = _load_csv(trends_path)
-bundles_df = _load_csv(bundles_path)
-posts_df = _load_csv(posts_path)
-post_plans = _load_post_plans(post_plans_path)
+def _current_week() -> str:
+    iso = date.today().isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
 
-summary_col, metric_col_1, metric_col_2, metric_col_3 = st.columns([2, 1, 1, 1])
-with summary_col:
-    st.subheader("Current recommendation")
-    if summary_path.exists():
-        summary_text = summary_path.read_text(encoding="utf-8")
-        preview_lines = []
-        for line in summary_text.splitlines():
-            if line.startswith("## "):
-                continue
-            if line.strip().startswith("- What is working best right now") or line.strip().startswith("- What to do next") or line.strip().startswith("- Confidence level"):
-                preview_lines.append(line)
-        st.markdown("\n".join(preview_lines) if preview_lines else "Run the report workflow to generate a recommendation.")
-    else:
-        st.info("Run `python -m saveloop.cli report` to generate a recommendation.")
-with metric_col_1:
-    st.metric("Trends", len(trends_df))
-with metric_col_2:
-    st.metric("Bundles", len(bundles_df))
-with metric_col_3:
-    st.metric("Posts", len(posts_df))
+def _log_to_catalog(plan: dict) -> None:
+    catalog = _load_json_list(catalog_path)
+    entry = {
+        "bundle_id":    plan.get("bundle_id"),
+        "bundle_title": plan.get("bundle_title"),
+        "trend_keyword":plan.get("trend_keyword"),
+        "theme":        plan.get("theme"),
+        "format":       plan.get("format"),
+        "hook":         plan.get("hook"),
+        "posted_at":    date.today().isoformat(),
+        "week":         _current_week(),
+        "logged_at":    datetime.now(timezone.utc).isoformat(),
+    }
+    catalog = [c for c in catalog if not (
+        c.get("bundle_id") == entry["bundle_id"] and c.get("week") == entry["week"]
+    )]
+    catalog.append(entry)
+    _save_json_list(catalog_path, catalog)
 
-trend_tab, bundle_tab, generation_tab, performance_tab = st.tabs(["Trends", "Bundle Board", "Generation Studio", "Performance"])
+def _this_week_catalog() -> list[dict]:
+    return [c for c in _load_json_list(catalog_path) if c.get("week") == _current_week()]
 
-with trend_tab:
-    st.subheader("Trend snapshot")
-    if trends_df.empty:
-        st.info("No trend snapshot found yet. Run the trends workflow first.")
-    else:
-        theme_filter = st.multiselect("Filter by theme", sorted(trends_df["theme"].dropna().unique().tolist()))
-        source_filter = st.multiselect("Filter by source", sorted(trends_df["source"].dropna().unique().tolist()))
-        view_df = trends_df.copy()
-        if theme_filter:
-            view_df = view_df[view_df["theme"].isin(theme_filter)]
-        if source_filter:
-            view_df = view_df[view_df["source"].isin(source_filter)]
-        st.dataframe(view_df, use_container_width=True)
+def _this_week_keywords() -> set[str]:
+    return {str(c.get("trend_keyword", "")).lower() for c in _this_week_catalog()}
 
-with bundle_tab:
-    st.subheader("Bundle board")
-    if bundles_df.empty:
-        st.info("No bundle file found yet. Run `python -m saveloop.cli bundles` first.")
-    else:
-        status_options = ["draft", "shortlisted", "selected", "posted", "archived"]
-        theme_filter = st.multiselect("Theme", sorted(bundles_df["theme"].dropna().unique().tolist()), key="bundle_theme")
-        status_filter = st.multiselect("Status", status_options, key="bundle_status")
-        view_df = bundles_df.copy()
-        if theme_filter:
-            view_df = view_df[view_df["theme"].isin(theme_filter)]
-        if status_filter:
-            view_df = view_df[view_df["status"].isin(status_filter)]
 
-        top_candidates = view_df.sort_values("priority_score", ascending=False).head(3)
-        if not top_candidates.empty:
-            st.markdown("### Top candidates")
-            rank_labels = ["#1 Best next post", "#2 Backup option", "#3 Exploratory option"]
-            for idx, (_, row) in enumerate(top_candidates.iterrows()):
-                label = rank_labels[idx] if idx < len(rank_labels) else f"#{idx + 1} Candidate"
-                st.markdown(
-                    f"**{label}: {row['bundle_title']}**  \n"
-                    f"Trend: `{row['trend_keyword']}`  \n"
-                    f"Why it matters: {row['angle']}  \n"
-                    f"Suggested move: {row['hook']}  \n"
-                    f"Effort: Low–Medium  \n"
-                    f"Expected return: {'Medium–High' if row['priority_score'] >= 0.75 else 'Medium'}"
-                )
+# ── Load data ─────────────────────────────────────────────────────────────────
 
-        editable = view_df[[
-            "bundle_id",
-            "bundle_title",
-            "theme",
-            "trend_keyword",
-            "format",
-            "hook_style",
-            "posting_window",
-            "priority_score",
-            "status",
-            "notes",
-        ]].copy()
-        edited = st.data_editor(
-            editable,
+trends_df   = _load_csv(trends_path)
+bundles_df  = _load_csv(bundles_path)
+posts_df    = _load_csv(posts_path)
+catalog     = _this_week_catalog()
+this_week   = _current_week()
+
+
+# ── Header ────────────────────────────────────────────────────────────────────
+
+week_num   = date.today().isocalendar()[1]
+palette    = palette_for_week(week_num)
+used_topics = posted_keywords(lookback_weeks=8)
+
+st.title("SaveLoop")
+st.caption(f"{this_week}  ·  budget recipes · grocery swaps · Sunday resets  ·  this week's colour: **{palette['name']}**")
+st.divider()
+
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+
+weekly_tab, advanced_tab, performance_tab = st.tabs([
+    "This Week's Content", "Advanced", "Performance"
+])
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THIS WEEK'S CONTENT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with weekly_tab:
+    # ── What's been posted this week
+    if catalog:
+        posted_keywords = [c.get("trend_keyword", "") for c in catalog]
+        st.success(f"Already posted this week: {' · '.join(f'`{k}`' for k in posted_keywords)}")
+        st.caption("New packs will avoid these topics automatically.")
+        st.divider()
+
+    # ── Schedule preview
+    st.markdown("""
+**This week's plan:**
+
+| Day | Pillar | Best posting time |
+|---|---|---|
+| Tuesday | Weeknight recipe | 17:00–19:00 |
+| Wednesday | Grocery swap | 10:00–12:00 |
+| Sunday | Sunday reset | 08:00–10:00 |
+""")
+
+    if not _gemini_available:
+        st.warning("Set `GEMINI_API_KEY` in `.env` for real slide content. Without it, slides will be placeholder text.")
+
+    st.divider()
+
+    # ── Main action
+    # Colour wheel preview
+    st.markdown("**Colour rotation — 8-week spectrum:**")
+    swatch_cols = st.columns(8)
+    for i, (col, pal) in enumerate(zip(swatch_cols, PALETTES)):
+        is_current = (i == week_num % 8)
+        bg = "#{:02x}{:02x}{:02x}".format(*pal["bg"])
+        ac = "#{:02x}{:02x}{:02x}".format(*pal["accent"])
+        border = "3px solid #000" if is_current else "1px solid #ccc"
+        col.markdown(
+            f'<div style="background:{bg};border:{border};border-radius:8px;padding:8px 4px;text-align:center">'
+            f'<div style="background:{ac};height:8px;border-radius:4px;margin-bottom:4px"></div>'
+            f'<span style="font-size:11px;color:#555">{"→ " if is_current else ""}{pal["name"]}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    st.divider()
+
+    if st.button("🗓 Generate this week's 3 posts", type="primary", use_container_width=True):
+        with st.spinner("Picking topics · writing copy · rendering slides… (~30 seconds with Gemini)"):
+            try:
+                provider = "gemini" if _gemini_available else "rule_based"
+                zip_bytes, meta = build_weekly_pack(text_provider=provider)
+                st.session_state["_weekly_zip"]          = zip_bytes
+                st.session_state["_weekly_zip_name"]     = f"saveloop_{this_week}.zip"
+                st.session_state["_weekly_generated_at"] = datetime.now().strftime("%H:%M")
+                st.session_state["_weekly_meta"]         = meta
+            except Exception as exc:
+                st.error(f"Generation failed: {exc}")
+                st.exception(exc)
+
+    if st.session_state.get("_weekly_zip"):
+        meta = st.session_state.get("_weekly_meta", {})
+        st.success(f"Ready — {meta.get('palette','?')} palette · generated at {st.session_state.get('_weekly_generated_at', '')}")
+
+        st.download_button(
+            label="⬇  Download this week's content pack (.zip)",
+            data=st.session_state["_weekly_zip"],
+            file_name=st.session_state.get("_weekly_zip_name", "saveloop_weekly.zip"),
+            mime="application/zip",
             use_container_width=True,
-            hide_index=True,
-            column_config={
-                "status": st.column_config.SelectboxColumn(options=status_options),
-                "priority_score": st.column_config.NumberColumn(format="%.3f"),
-            },
-            key="bundle_editor",
+            type="primary",
         )
 
-        if st.button("Save bundle status updates"):
-            merge_cols = ["bundle_id", "status", "notes"]
-            merged = bundles_df.drop(columns=[c for c in ["status", "notes"] if c in bundles_df.columns]).merge(
-                edited[merge_cols], on="bundle_id", how="left"
-            )
-            merged.to_csv(bundles_path, index=False)
-            st.success("Bundle updates saved.")
+        st.caption("""
+**Inside the zip:**
+```
+posting_schedule.txt       ← exact days, times, hooks at a glance
+1_Tuesday_<topic>/
+   slide_01_cover.png      ← upload these 7 slides as a carousel
+   slide_02_content.png
+   ...
+   slide_07_cta.png
+   caption.txt             ← paste this directly into Instagram
+   hashtags.txt
+2_Wednesday_<topic>/
+3_Sunday_<topic>/
+```
+""")
 
-with generation_tab:
-    st.subheader("Generation studio")
-    if bundles_df.empty:
-        st.info("Generate bundles first to create content plans.")
-    else:
-        st.markdown("Create stronger copy with an LLM, and optionally generate an image asset if your API key is configured.")
-        provider_col, image_col = st.columns([1, 1])
-        with provider_col:
-            text_provider = st.selectbox(
-                "Copy generation mode",
-                options=["rule_based", "gemini"],
-                format_func=lambda x: "Rule-based fallback" if x == "rule_based" else "LLM-enhanced (Gemini)",
-            )
-        with image_col:
-            generate_image_asset = st.checkbox("Generate image asset", value=False)
+        with st.expander("After posting — log it here"):
+            st.caption("Keeps track so next week's pack picks fresh topics.")
+            bundles_df_fresh = _load_csv(bundles_path)
+            if not bundles_df_fresh.empty:
+                options = bundles_df_fresh["bundle_title"].tolist()
+                to_log = st.multiselect("Which posts did you publish?", options)
+                if st.button("Mark as posted") and to_log:
+                    posted_df = bundles_df_fresh[bundles_df_fresh["bundle_title"].isin(to_log)]
+                    for _, row in posted_df.iterrows():
+                        _log_to_catalog(row.to_dict())
+                        bundles_df_fresh.loc[bundles_df_fresh["bundle_id"] == row["bundle_id"], "status"] = "posted"
+                    bundles_df_fresh.to_csv(bundles_path, index=False)
+                    st.success("Logged. Next week's pack will pick new topics.")
+                    st.rerun()
 
-        if text_provider == "gemini":
-            st.caption("Uses GEMINI_API_KEY and SAVELOOP_TEXT_MODEL if available. Falls back to rules if not configured.")
-        if generate_image_asset:
-            st.caption("Image backend is controlled by SAVELOOP_IMAGE_BACKEND. Use `local` for on-device assets or `gemini` for API generation with local fallback.")
+    # ── Refresh trends inline
+    st.divider()
+    with st.expander("Refresh trend signals first (optional)"):
+        st.caption("Pulls this week's top posts from Reddit and rising queries from Google Trends UK.")
+        if st.button("🔄 Fetch fresh trends"):
+            with st.spinner("Fetching… (~20 seconds)"):
+                try:
+                    from saveloop.trends.fetchers import fetch_fresh_trends
+                    from saveloop.trends.scoring import score_trends as _score
+                    fresh = _score(fetch_fresh_trends())
+                    st.success(f"Fetched {len(fresh)} signals. Generate the pack to use them.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Fetch failed: {exc}")
 
-        bundle_options = bundles_df.sort_values(["priority_score", "bundle_title"], ascending=[False, True])
-        labels = {
-            row["bundle_id"]: f"{row['bundle_title']} ({row['status']}, score {row['priority_score']:.2f})"
-            for _, row in bundle_options.iterrows()
-        }
-        default_bundle_id = None
-        selected_rows = bundle_options[bundle_options["status"] == "selected"]
-        if not selected_rows.empty:
-            default_bundle_id = selected_rows.iloc[0]["bundle_id"]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ADVANCED — single post, bundle board, trends
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with advanced_tab:
+    adv_trends, adv_bundles, adv_single = st.tabs(["Trends", "Bundle Board", "Single Post"])
+
+    with adv_trends:
+        st.subheader("Trend snapshot")
+        if trends_df.empty:
+            st.info("No trends yet. Use 'Fetch fresh trends' on the main tab.")
         else:
-            default_bundle_id = bundle_options.iloc[0]["bundle_id"]
+            st.dataframe(trends_df, use_container_width=True, hide_index=True)
 
-        selected_bundle_id = st.selectbox(
-            "Choose a bundle to generate",
-            options=bundle_options["bundle_id"].tolist(),
-            format_func=lambda x: labels.get(x, x),
-            index=bundle_options["bundle_id"].tolist().index(default_bundle_id),
-        )
+    with adv_bundles:
+        st.subheader("Bundle board")
+        if bundles_df.empty:
+            st.info("No bundles yet.")
+        else:
+            status_options = ["draft", "shortlisted", "selected", "posted", "archived"]
+            editable = bundles_df[[c for c in [
+                "bundle_id", "bundle_title", "pillar", "trend_keyword",
+                "format", "posting_window", "priority_score", "status", "notes",
+            ] if c in bundles_df.columns]].copy()
+            edited = st.data_editor(
+                editable, use_container_width=True, hide_index=True,
+                column_config={"status": st.column_config.SelectboxColumn(options=status_options)},
+                key="bundle_editor",
+            )
+            if st.button("Save changes"):
+                merged = bundles_df.drop(columns=[c for c in ["status", "notes"] if c in bundles_df.columns]).merge(
+                    edited[["bundle_id", "status", "notes"]], on="bundle_id", how="left"
+                )
+                merged.to_csv(bundles_path, index=False)
+                st.success("Saved.")
+                st.rerun()
 
-        selected_bundle = bundle_options[bundle_options["bundle_id"] == selected_bundle_id].iloc[0].to_dict()
-        plan = build_post_plan(
-            selected_bundle,
-            text_provider=text_provider,
-            generate_image_asset=generate_image_asset,
-        )
+    with adv_single:
+        st.subheader("Single post studio")
+        if bundles_df.empty:
+            st.info("No bundles available.")
+        else:
+            this_week_kws = _this_week_keywords()
 
-        left, right = st.columns([1.3, 1])
-        with left:
-            st.markdown("### Generated post")
-            st.markdown(f"**Title**: {plan['bundle_title']}")
-            st.markdown(f"**Hook**: {plan['hook']}")
-            st.markdown(f"**Overlay text**: {plan['overlay_text']}")
-            st.markdown(f"**Tone**: {plan['tone']}")
-            st.markdown(f"**Copy provider**: {plan['text_provider']}")
-            st.markdown(f"**Caption**:\n\n{plan['caption']}")
-            st.markdown("**Script beats**")
-            for bullet in plan["script_bullets"]:
-                st.markdown(f"- {bullet}")
-            st.markdown(f"**Hashtags**: {plan['hashtags']}")
+            def _label(row: pd.Series) -> str:
+                kw = str(row.get("trend_keyword", "")).lower()
+                flag = " ⚠ done this week" if kw in this_week_kws else ""
+                return f"{row['bundle_title']} ({row.get('pillar','')}, {row['priority_score']:.2f}){flag}"
 
-        with right:
-            st.markdown("### Asset directions")
-            st.markdown(f"**Image prompt**: {plan['image_prompt']}")
-            st.markdown(f"**Music recommendation**: {plan['music_style']}")
-            st.markdown(f"**Music note**: {plan['music_note']}")
-            st.markdown(f"**Posting window**: {plan['posting_window']}")
-            st.markdown(f"**Priority score**: {plan['priority_score']}")
-            if plan.get("image_backend"):
-                st.markdown(f"**Image backend**: {plan['image_backend']}")
-            if plan.get("image_generated") and plan.get("image_path"):
-                st.markdown("**Generated image preview**")
-                st.image(plan["image_path"], use_container_width=True)
-            elif plan.get("image_error"):
-                st.warning(f"Image generation not completed: {plan['image_error']}")
+            opts = bundles_df.sort_values("priority_score", ascending=False)
+            selected_id = st.selectbox(
+                "Bundle",
+                options=opts["bundle_id"].tolist(),
+                format_func=lambda x: _label(opts[opts["bundle_id"] == x].iloc[0]),
+            )
+            selected_bundle = opts[opts["bundle_id"] == selected_id].iloc[0].to_dict()
 
-        if st.button("Save generated post plan"):
-            out_path = save_post_plan(plan)
-            st.success(f"Saved generated post plan to {out_path}")
+            if st.button("Generate", type="primary"):
+                provider = "gemini" if _gemini_available else "rule_based"
+                with st.spinner("Generating…"):
+                    plan = build_post_plan(selected_bundle, text_provider=provider)
+                    st.session_state["_single_plan"] = plan
 
-        if post_plans:
-            st.markdown("### Saved post plans")
-            st.dataframe(pd.DataFrame(post_plans), use_container_width=True)
+            plan = st.session_state.get("_single_plan")
+            if plan and plan.get("bundle_id") == selected_id:
+                st.markdown(f"**Hook:** {plan['hook']}")
+                st.markdown(f"**Caption:**\n\n{plan['caption']}")
+                if plan.get("slides"):
+                    with st.expander("Slides"):
+                        for i, s in enumerate(plan["slides"], 2):
+                            st.markdown(f"**{i}. {s['title']}** — {s['body']}")
+
+                if st.button("Prepare pack"):
+                    with st.spinner("Rendering slides…"):
+                        try:
+                            zb = export_instagram_pack(plan)
+                            st.session_state["_single_zip"] = zb
+                            st.session_state["_single_zip_name"] = f"saveloop_{plan.get('bundle_id')}.zip"
+                        except Exception as exc:
+                            st.error(str(exc))
+
+                if st.session_state.get("_single_zip"):
+                    st.download_button(
+                        "⬇ Download pack",
+                        data=st.session_state["_single_zip"],
+                        file_name=st.session_state.get("_single_zip_name", "pack.zip"),
+                        mime="application/zip",
+                    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PERFORMANCE
+# ═══════════════════════════════════════════════════════════════════════════════
 
 with performance_tab:
     st.subheader("Performance")
+
+    # ── Full post history
+    history = all_history()
+    if history:
+        st.markdown("#### Post history (all weeks)")
+        rows = []
+        for entry in reversed(history):
+            for post in entry.get("posts", []):
+                rows.append({
+                    "week":          entry.get("week"),
+                    "palette":       entry.get("palette"),
+                    "day":           post.get("post_day"),
+                    "topic":         post.get("bundle_title"),
+                    "keyword":       post.get("trend_keyword"),
+                    "pillar":        post.get("pillar"),
+                    "hook":          post.get("hook"),
+                    "published":     "✓" if post.get("published") else "—",
+                })
+        hist_df = pd.DataFrame(rows)
+        st.dataframe(hist_df, use_container_width=True, hide_index=True)
+
+        # Mark as published
+        with st.expander("Mark posts as published"):
+            all_topics = [r["topic"] for r in rows if r["published"] == "—"]
+            to_mark = st.multiselect("Select posts you actually published", all_topics)
+            if st.button("Mark published") and to_mark:
+                for title in to_mark:
+                    mark_posted(title)
+                st.success("Updated.")
+                st.rerun()
+
+        # Topics used — handy at a glance
+        all_keywords = [r["keyword"] for r in rows]
+        st.markdown(f"**Topics covered so far ({len(all_keywords)}):** " +
+                    "  ".join(f"`{k}`" for k in sorted(set(all_keywords))))
+        st.divider()
+
     if summary_path.exists():
         st.markdown(summary_path.read_text(encoding="utf-8"))
     else:
-        st.info("No summary generated yet. Run `python -m saveloop.cli report` first.")
+        st.info("Run `python -m saveloop.cli report` to generate a performance summary.")
 
     if not posts_df.empty:
-        st.markdown("### Posted bundles")
-        cols = [c for c in ["post_id", "bundle_id", "pattern", "aesthetic_tags", "J_score", "engagement_rate", "win_flag"] if c in posts_df.columns]
-        st.dataframe(posts_df[cols], use_container_width=True)
+        cols = [c for c in ["post_id","bundle_id","pattern","aesthetic_tags","J_score","engagement_rate","win_flag"] if c in posts_df.columns]
+        st.dataframe(posts_df[cols], use_container_width=True, hide_index=True)

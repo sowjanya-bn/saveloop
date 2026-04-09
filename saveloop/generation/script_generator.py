@@ -12,12 +12,44 @@ def _tone_for_theme(theme: str) -> str:
     }.get(theme, "clear, practical")
 
 
+def _hook_pattern_for_style(hook_style: str) -> str:
+    return {
+        "problem_first": "contrast",
+        "curiosity_first": "question",
+        "utility_first": "number_list",
+        "story_first": "story_open",
+    }.get(hook_style, "bold_claim")
+
+
+def _slides_for_bundle(keyword: str, angle: str, caption_direction: str, hook: str, cta: str) -> list[dict[str, str]]:
+    """
+    Build slide structure from bundle fields.
+    Rule-based mode cannot generate real topic-specific content — it produces
+    a structural scaffold using the bundle's own angle and direction text.
+    Use Gemini mode for slides with actual tips and steps.
+    """
+    # Use the bundle's own angle/direction as the content where possible
+    direction_snippet = caption_direction[:100] if caption_direction else f"a useful take on {keyword}"
+    angle_snippet = angle[:80] if angle else keyword
+
+    return [
+        {"title": "What is it?", "body": f"{angle_snippet}."},
+        {"title": "Why it matters", "body": f"{direction_snippet}."},
+        {"title": "How to do it", "body": f"[Switch to LLM mode for real steps on {keyword}]"},
+        {"title": "Common mistake", "body": f"[Switch to LLM mode for real tips on {keyword}]"},
+        {"title": "Your takeaway", "body": cta},
+    ]
+
+
 def generate_script(bundle: dict[str, Any]) -> dict[str, Any]:
     theme = str(bundle.get("theme", "general"))
     keyword = str(bundle.get("trend_keyword", "this idea"))
     hook = str(bundle.get("hook", f"Why {keyword} is worth trying"))
     caption_stub = str(bundle.get("caption_stub", f"A simple take on {keyword}."))
     cta = str(bundle.get("cta", "Save this for later"))
+    hook_style = str(bundle.get("hook_style", ""))
+    angle = str(bundle.get("angle", ""))
+    caption_direction = str(bundle.get("caption_direction", ""))
 
     bullets = {
         "fitness": [
@@ -61,4 +93,6 @@ def generate_script(bundle: dict[str, Any]) -> dict[str, Any]:
         "caption": caption,
         "bullets": bullets,
         "closing_cta": cta,
+        "hook_pattern": _hook_pattern_for_style(hook_style),
+        "slides": _slides_for_bundle(keyword, angle, caption_direction, hook, cta),
     }

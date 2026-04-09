@@ -7,7 +7,7 @@ from saveloop.bundles.writer import save_bundles
 from saveloop.generation.post_assembler import build_post_plan, save_post_plan
 from saveloop.io.loaders import load_posts_log
 from saveloop.reporting.markdown import run_analysis_pipeline, write_summary
-from saveloop.trends.fetchers import load_trends
+from saveloop.trends.fetchers import fetch_fresh_trends, load_trends
 from saveloop.trends.scoring import score_trends
 
 
@@ -33,9 +33,14 @@ def _run_recommend() -> None:
     print(f"Updated recommendation in: {path}")
 
 
-def _run_trends() -> None:
-    trends_df = score_trends(load_trends())
-    print(f"Loaded {len(trends_df)} trend rows.")
+def _run_trends(fetch: bool = False) -> None:
+    if fetch:
+        print("Fetching fresh trends from Google Trends and Reddit…")
+        trends_df = score_trends(fetch_fresh_trends())
+        print(f"Fetched and saved {len(trends_df)} trend rows.")
+    else:
+        trends_df = score_trends(load_trends())
+        print(f"Loaded {len(trends_df)} trend rows.")
     if not trends_df.empty:
         preview = trends_df[["keyword", "theme", "trend_score"]].to_string(index=False)
         print(preview)
@@ -87,6 +92,7 @@ def main() -> None:
         choices=["validate", "analyze", "report", "recommend", "run", "trends", "bundles", "generate"],
         help="Pipeline step to run",
     )
+    parser.add_argument("--fetch", action="store_true", help="Fetch fresh trends from Google Trends and Reddit (use with 'trends')")
     args = parser.parse_args()
 
     if args.command == "validate":
@@ -100,7 +106,7 @@ def main() -> None:
     elif args.command == "run":
         _run_full()
     elif args.command == "trends":
-        _run_trends()
+        _run_trends(fetch=getattr(args, "fetch", False))
     elif args.command == "bundles":
         _run_bundles()
     elif args.command == "generate":
