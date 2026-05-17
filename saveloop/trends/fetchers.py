@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from datetime import date
@@ -18,39 +19,66 @@ REQUIRED_TREND_COLUMNS = [
     "notes",
 ]
 
-# ── Seed terms for each content pillar ───────────────────────────────────────
+# ── Seed terms for each watchdog theme ───────────────────────────────────────
 
 SEEDS = {
-    "food": [
-        "budget weeknight dinners",
-        "cheap family meals",
-        "simple grocery swaps",
-        "meal prep on a budget",
-        "supermarket own brand",
+    "shrinkflation": [
+        "shrinkflation UK",
+        "supermarket price increase",
+        "smaller packaging same price",
+        "product size reduced",
+        "unit price increase",
     ],
-    "lifestyle": [
-        "Sunday reset routine",
-        "weekly reset",
-        "tiny Sunday habits",
+    "fake_deals": [
+        "supermarket fake deal",
+        "loyalty card price",
+        "was now pricing",
+        "multi-buy not worth it",
+        "unit price comparison",
+    ],
+    "single_person": [
+        "cooking for one budget",
+        "single person food waste",
+        "bulk buy not worth it solo",
+        "one person grocery cost",
+    ],
+    "subscriptions": [
+        "subscription not worth it",
+        "cancel delivery pass",
+        "streaming too expensive",
+        "subscription trap UK",
     ],
 }
 
-# Reddit communities relevant to the niche
+# Reddit communities relevant to the watchdog niche
 SUBREDDITS = [
-    ("EatCheapAndHealthy", "food"),
-    ("MealPrepSunday",     "food"),
-    ("Frugal",             "food"),
-    ("UKPersonalFinance",  "food"),
-    ("simpleliving",       "lifestyle"),
+    ("Shrinkflation",       "shrinkflation"),
+    ("Frugal",              "shrinkflation"),
+    ("UKPersonalFinance",   "fake_deals"),
+    ("mildlyinfuriating",   "shrinkflation"),
+    ("assholedesign",       "fake_deals"),
+    ("CasualUK",            "single_person"),
+    ("UniUK",               "single_person"),
 ]
 
-# Keywords that signal pillar relevance — used to filter Reddit noise
+# Keywords that signal watchdog relevance — used to filter Reddit noise
 NICHE_SIGNALS = {
-    "food":      ["budget", "cheap", "meal", "recipe", "grocery", "dinner", "swap",
-                  "cook", "food", "eat", "ingredient", "prep", "freezer", "£", "$"],
-    "lifestyle": ["reset", "sunday", "routine", "habit", "simple", "slow", "calm",
-                  "week", "morning", "checklist"],
+    "shrinkflation": ["smaller", "size", "shrink", "weight", "gram", "ml", "reduced",
+                      "less", "price", "£", "unit"],
+    "fake_deals":    ["deal", "offer", "save", "discount", "loyalty", "clubcard", "nectar",
+                      "unit price", "per 100g"],
+    "single_person": ["one person", "cooking for one", "solo", "single", "bulk", "waste",
+                      "just me"],
+    "subscriptions": ["subscription", "cancel", "monthly", "worth it", "delivery pass",
+                      "prime", "plus"],
 }
+
+# RSS sources — (url, theme)
+RSS_FEEDS = [
+    ("https://www.moneysavingexpert.com/rss/news/",   "fake_deals"),
+    ("https://www.which.co.uk/news/rss",              "shrinkflation"),
+    ("https://feeds.bbci.co.uk/news/business/rss.xml","shrinkflation"),
+]
 
 
 # ── Google Trends fetcher ─────────────────────────────────────────────────────
@@ -90,7 +118,7 @@ def _fetch_google_trends(seeds: dict[str, list[str]]) -> list[dict]:
                             "observed_at": today,
                             "notes": f"related to '{seed}' ({query_type})",
                         })
-                time.sleep(1.2)   # be polite to the API
+                time.sleep(1.2)
             except Exception:
                 continue
 
@@ -111,7 +139,6 @@ def _is_relevant(title: str, theme: str) -> bool:
 
 
 def _reddit_momentum(upvotes: int, num_comments: int) -> float:
-    # Simple log-scaled score normalised to 0-1 range
     import math
     raw = math.log1p(upvotes) + math.log1p(num_comments) * 0.3
     return round(min(raw / 12.0, 0.95), 3)
@@ -155,6 +182,43 @@ def _fetch_reddit(subreddits: list[tuple[str, str]]) -> list[dict]:
     return rows
 
 
+# ── RSS fetcher ───────────────────────────────────────────────────────────────
+
+def _fetch_rss(feeds: list[tuple[str, str]]) -> list[dict]:
+    import requests
+    import xml.etree.ElementTree as ET
+
+    rows: list[dict] = []
+    today = date.today().isoformat()
+    headers = {"User-Agent": "saveloop-rss-fetcher/1.0"}
+
+    for url, theme in feeds:
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            if resp.status_code != 200:
+                continue
+            root = ET.fromstring(resp.content)
+            items = root.findall(".//item")
+            for item in items[:10]:
+                title = (item.findtext("title") or "").strip()
+                link = (item.findtext("link") or "").strip()
+                if not title or not _is_relevant(_clean_title(title), theme):
+                    continue
+                rows.append({
+                    "source": f"rss/{url.split('/')[2]}",
+                    "theme": theme,
+                    "keyword": _clean_title(title),
+                    "momentum_score": 0.60,   # RSS signals get a baseline score
+                    "observed_at": today,
+                    "notes": link[:120],
+                })
+            time.sleep(0.5)
+        except Exception:
+            continue
+
+    return rows
+
+
 # ── Deduplicate & merge ───────────────────────────────────────────────────────
 
 def _deduplicate(rows: list[dict]) -> list[dict]:
@@ -169,17 +233,77 @@ def _deduplicate(rows: list[dict]) -> list[dict]:
     return sorted(seen.values(), key=lambda r: r["momentum_score"], reverse=True)
 
 
+# ── Convert trend rows to candidate dicts ─────────────────────────────────────
+
+def _rows_to_candidates(rows: list[dict]) -> list[dict]:
+    today = date.today().isoformat()
+    candidates = []
+    for row in rows:
+        raw_text = str(row["keyword"])
+        cid = "tr_" + hashlib.md5(f"{row['source']}:{raw_text}".encode()).hexdigest()[:10]
+        candidates.append({
+            "candidate_id": cid,
+            "source": row["source"],
+            "raw_text": raw_text,
+            "theme": row["theme"],
+            "product": None,
+            "retailer": None,
+            "claimed_change": None,
+            "old_value": None,
+            "new_value": None,
+            "unit_price_before": None,
+            "unit_price_after": None,
+            "verified_increase_pct": None,
+            "source_url": row.get("notes", ""),
+            "submitted_by": None,
+            "observed_at": today,
+            "status": "new",
+            "verification_label": "unverified",
+            "verification_notes": "",
+            "confidence": float(row.get("momentum_score", 0.0)),
+        })
+    return candidates
+
+
+def _append_to_candidates(candidates: list[dict]) -> int:
+    """Append new candidate rows to candidates.csv. Returns count added."""
+    from saveloop.io.loaders import load_candidates
+
+    paths = project_paths()
+    cand_path = paths["raw_data_dir"] / "candidates.csv"
+
+    try:
+        existing = load_candidates(cand_path)
+        existing_ids = set(existing["candidate_id"].tolist())
+    except Exception:
+        existing = pd.DataFrame()
+        existing_ids = set()
+
+    new_rows = [c for c in candidates if c["candidate_id"] not in existing_ids]
+    if not new_rows:
+        return 0
+
+    new_df = pd.DataFrame(new_rows)
+    combined = pd.concat([existing, new_df], ignore_index=True) if not existing.empty else new_df
+    cand_path.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(cand_path, index=False)
+    return len(new_rows)
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def fetch_fresh_trends(
     use_google: bool = True,
     use_reddit: bool = True,
+    use_rss: bool = True,
     save: bool = True,
 ) -> pd.DataFrame:
     """
-    Pull trend signals from Google Trends and/or Reddit.
-    Merges with any existing manual entries, deduplicates, and optionally
-    overwrites trends_snapshot.csv.
+    Pull signals from Google Trends, Reddit, and RSS feeds.
+
+    - Saves a trends_snapshot.csv for display in the Advanced tab.
+    - Also appends new signals as Candidates (status: new) to candidates.csv.
+    - Returns a trends-format DataFrame (backward compatible with score_trends).
     """
     rows: list[dict] = []
 
@@ -189,12 +313,15 @@ def fetch_fresh_trends(
     if use_reddit:
         rows += _fetch_reddit(SUBREDDITS)
 
+    if use_rss:
+        rows += _fetch_rss(RSS_FEEDS)
+
     if not rows:
         return load_trends()
 
     fresh_df = pd.DataFrame(_deduplicate(rows))
 
-    # Keep manual entries that are not duplicated by fresh data
+    # Keep manual entries not duplicated by fresh data
     try:
         existing = load_trends()
         manual = existing[existing["source"].str.startswith("manual")]
@@ -208,6 +335,10 @@ def fetch_fresh_trends(
         paths = project_paths()
         out = paths["raw_data_dir"] / "trends_snapshot.csv"
         fresh_df.to_csv(out, index=False)
+
+    # Populate candidates.csv with new signals
+    candidates = _rows_to_candidates(_deduplicate(rows))
+    _append_to_candidates(candidates)
 
     return fresh_df
 

@@ -23,3 +23,7 @@ class ContentBundle:
     priority_score: float
     status: str = "draft"
     notes: str = ""
+
+    # Links back to the source candidate and carries verification through to post
+    candidate_id: str = ""
+    verification_label: str = ""

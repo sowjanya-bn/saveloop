@@ -12,3 +12,6 @@ thresholds:
 
 reporting:
   summary_filename: weekly_summary.md
+
+integrations:
+  submissions_csv: data/raw/submissions.csv

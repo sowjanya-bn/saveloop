@@ -1,0 +1,20 @@
+candidate_id,source,raw_text,theme,product,retailer,claimed_change,old_value,new_value,unit_price_before,unit_price_after,verified_increase_pct,source_url,submitted_by,observed_at,status,verification_label,verification_notes,confidence
+tr_cb237200c3,reddit/r/Frugal,i have been actively taking public buses since the spike in gas prices and my wa,shrinkflation,,,,,,,,,"2251 upvotes, 279 comments",,2026-05-17,needs_more_evidence,interesting_unconfirmed,,0.784
+tr_711d03964b,reddit/r/Frugal,the shrinkflation enshittification is real,shrinkflation,,,,,,,,,"798 upvotes, 132 comments",,2026-05-17,new,unverified,,0.679
+tr_0d7fb8d89a,reddit/r/Shrinkflation,they used to be 500 grams packs of bacon a month or so ago but now they are 375,shrinkflation,,,,,,,,,"661 upvotes, 40 comments",,2026-05-17,new,unverified,,0.634
+tr_229b5f07b1,reddit/r/Shrinkflation,16 less bread,shrinkflation,,,,,,,,,"551 upvotes, 22 comments",,2026-05-17,new,unverified,,0.605
+tr_e50e7c0ea2,rss/feeds.bbci.co.uk,robert paid £726 to skip the driving test waiting list new laws mean others won,shrinkflation,,,,,,,,,https://www.bbc.com/news/articles/cx219pn5g70o?at_medium=RSS&at_campaign=rss,,2026-05-17,new,unverified,,0.6
+tr_559d094648,rss/feeds.bbci.co.uk,they took £20 000 i didnt owe parents hit by child maintenance errors,shrinkflation,,,,,,,,,https://www.bbc.com/news/articles/cq8wjn98y85o?at_medium=RSS&at_campaign=rss,,2026-05-17,new,unverified,,0.6
+tr_ced315267d,rss/feeds.bbci.co.uk,british gas pays £20m over prepayment meter forcefitting scandal,shrinkflation,,,,,,,,,https://www.bbc.com/news/articles/cq8p7l1y59lo?at_medium=RSS&at_campaign=rss,,2026-05-17,new,unverified,,0.6
+tr_5bf2e7c604,reddit/r/Shrinkflation,shrinkflation and skimpflation all in one thanks dove,shrinkflation,,,,,,,,,"405 upvotes, 44 comments",,2026-05-17,new,unverified,,0.596
+tr_43a1d0c464,reddit/r/Shrinkflation,another dawn soap post costco same size but different ingredients old new,shrinkflation,,,,,,,,,"304 upvotes, 39 comments",,2026-05-17,new,unverified,,0.569
+tr_0e9f84dbf4,reddit/r/Shrinkflation,caddbury 50g down to 45g price stays the same,shrinkflation,,,,,,,,,"288 upvotes, 20 comments",,2026-05-17,new,unverified,,0.548
+tr_1433bae989,reddit/r/Shrinkflation,i can feel the weight change,shrinkflation,,,,,,,,,"221 upvotes, 15 comments",,2026-05-17,new,unverified,,0.52
+tr_b7690f53b2,reddit/r/Shrinkflation,figured out the new recipe it s add 1 oz less of the ingredients,shrinkflation,,,,,,,,,"261 upvotes, 7 comments",,2026-05-17,new,unverified,,0.516
+tr_de135aeaba,reddit/r/Shrinkflation,pringles size comparison,shrinkflation,,,,,,,,,"161 upvotes, 35 comments",,2026-05-17,new,unverified,,0.514
+tr_acb469fdae,reddit/r/Shrinkflation,same price for less,shrinkflation,,,,,,,,,"185 upvotes, 13 comments",,2026-05-17,new,unverified,,0.501
+tr_366070be82,reddit/r/Shrinkflation,german court backs consumers in milka chocolate bar shrinkflation case,shrinkflation,,,,,,,,,"212 upvotes, 2 comments",,2026-05-17,new,unverified,,0.474
+tr_bf5a03de48,reddit/r/Frugal,be mindful of fake sales events and prices,shrinkflation,,,,,,,,,"120 upvotes, 8 comments",,2026-05-17,new,unverified,,0.455
+seed_hm_001,manual,Spaghetti bolognese honest cost including oil spices and gas,honest_meal,Spaghetti bolognese,,,,,,,,,,2026-05-17,new,unverified,honest_meal seed — verification not required,0.75
+seed_hm_002,manual,Chicken stir fry honest cost including oil soy sauce and gas,honest_meal,Chicken stir fry,,,,,,,,,,2026-05-17,new,unverified,honest_meal seed — verification not required,0.72
+seed_hm_003,manual,Lentil soup honest cost including stock spices and gas,honest_meal,Lentil soup,,,,,,,,,,2026-05-17,new,unverified,honest_meal seed — verification not required,0.7
